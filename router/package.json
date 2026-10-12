@@ -3,12 +3,17 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
-    "bootstrap": "^4.6.0",
+    "@fluentui/react": "^8.125.8",
+    "bootstrap": "^4.6.2",
+    "holderjs": "^2.9.9",
     "react": "^18.2.0",
+    "react-async": "^10.0.1",
     "react-bootstrap": "^2.10.10",
     "react-dom": "^18.3.1",
+    "react-lottie": "^1.2.10",
     "react-router-dom": "^7.18.4",
-    "react-scripts": "^5.0.1"
+    "react-scripts": "^5.0.1",
+    "sass": "^1.105.1"
   },
   "scripts": {
     "start": "react-scripts start",
