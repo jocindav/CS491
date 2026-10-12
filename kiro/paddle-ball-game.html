@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Paddle Ball Game</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #000;
+      height: 100%;
+    }
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    /* Task 1: black background behind the canvas; dark navy playfield applied in draw() */
+    canvas {
+      background: #01012f; /* dark navy playfield (customization) */
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <!-- Task 1: canvas element at 600x300 -->
+  <canvas id="game" width="600" height="300"></canvas>
+
+  <script>
+    // ---- Task 1: grab canvas + context (with a simple existence check) ----
+    const canvas = document.getElementById('game');
+    if (!canvas) {
+      throw new Error('Canvas element not found');
+    }
+    const ctx = canvas.getContext('2d');
+
+    // ---- Customization settings ----
+    const BALL_COLOR = 'lightblue';   // light blue ball
+    const PADDLE_COLOR = 'blue';      // blue paddles
+    const BG_COLOR = '#01012f';       // dark navy background
+
+    const AI_DIFFICULTY = 0.5;        // easy
+    const BALL_SPEED = 6;             // fast
+    const PADDLE_SPEED = 7;           // fast player paddle speed
+
+    const PADDLE_WIDTH = 10;          // normal
+    const PADDLE_HEIGHT = 80;         // normal
+    const BALL_RADIUS = 7;
+
+    // Extra feature: ball gets faster as time progresses.
+    // Current speed multiplier grows slowly while the ball is in play and
+    // resets back to 1 whenever the ball is reset to center.
+    const SPEED_RAMP_PER_FRAME = 0.0008; // how quickly the ball accelerates
+    const MAX_SPEED_MULTIPLIER = 2.2;    // cap so it stays playable
+    let speedMultiplier = 1;
+
+    const WIDTH = canvas.width;       // 600
+    const HEIGHT = canvas.height;     // 300
+
+    // ---- Task 2: game variables ----
+    // Ball: position (x, y) and speed (dx, dy)
+    let ballX, ballY, ballDX, ballDY;
+
+    // Paddles: vertical position of each paddle's top edge
+    let leftY = (HEIGHT - PADDLE_HEIGHT) / 2;   // computer paddle
+    let rightY = (HEIGHT - PADDLE_HEIGHT) / 2;  // player paddle
+
+    // Scoreboard state (fancy scoreboard: borders + game timer)
+    let playerScore = 0;
+    let computerScore = 0;
+    const gameStartTime = Date.now(); // used to render elapsed game time
+
+    // Input state
+    let upPressed = false;
+    let downPressed = false;
+
+    // ---- Task 2: initialize ball at center with a random direction ----
+    function resetBall() {
+      ballX = WIDTH / 2;
+      ballY = HEIGHT / 2;
+      // random horizontal direction (left or right) and random vertical angle
+      const dirX = Math.random() < 0.5 ? -1 : 1;
+      const dirY = Math.random() < 0.5 ? -1 : 1;
+      ballDX = BALL_SPEED * dirX;
+      ballDY = BALL_SPEED * dirY * (0.4 + Math.random() * 0.6); // slight angle variety
+      speedMultiplier = 1; // reset the time-based speed ramp each serve
+    }
+    resetBall();
+
+    // ---- Task 3 + Task 8: drawing functions ----
+    function drawBackground() {
+      ctx.fillStyle = BG_COLOR;        // navy
+      ctx.fillRect(0, 0, WIDTH, HEIGHT);
+    }
+
+    function drawBall() {
+      ctx.fillStyle = BALL_COLOR;      // light blue
+      ctx.beginPath();
+      ctx.arc(ballX, ballY, BALL_RADIUS, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    function drawPaddles() {
+      ctx.fillStyle = PADDLE_COLOR;    // blue
+      // left (computer) paddle
+      ctx.fillRect(0, leftY, PADDLE_WIDTH, PADDLE_HEIGHT);
+      // right (player) paddle
+      ctx.fillRect(WIDTH - PADDLE_WIDTH, rightY, PADDLE_WIDTH, PADDLE_HEIGHT);
+    }
+
+    function formatTime(ms) {
+      const totalSeconds = Math.floor(ms / 1000);
+      const minutes = Math.floor(totalSeconds / 60);
+      const seconds = totalSeconds % 60;
+      return minutes + ':' + (seconds < 10 ? '0' : '') + seconds;
+    }
+
+    function drawScore() {
+      // Fancy scoreboard: a bordered box, centered at the top, showing the
+      // score plus a running game timer.
+      const boxWidth = 260;
+      const boxHeight = 46;
+      const boxX = (WIDTH - boxWidth) / 2;
+      const boxY = 8;
+
+      // Panel background + border.
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+      ctx.fillRect(boxX, boxY, boxWidth, boxHeight);
+      ctx.strokeStyle = PADDLE_COLOR;
+      ctx.lineWidth = 2;
+      ctx.strokeRect(boxX, boxY, boxWidth, boxHeight);
+
+      // Score line.
+      ctx.fillStyle = '#ffffff';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.font = 'bold 18px Arial';
+      ctx.fillText(
+        'Player ' + playerScore + '  —  ' + computerScore + ' Computer',
+        WIDTH / 2,
+        boxY + 15
+      );
+
+      // Timer line.
+      ctx.font = '12px Arial';
+      ctx.fillStyle = '#9fd0ff';
+      ctx.fillText(
+        'Time ' + formatTime(Date.now() - gameStartTime),
+        WIDTH / 2,
+        boxY + 33
+      );
+    }
+
+    function draw() {
+      drawBackground();   // clears the canvas each frame
+      drawBall();
+      drawPaddles();
+      drawScore();
+    }
+
+    // ---- Task 6: simple AI for the left (computer) paddle ----
+    function updateAI() {
+      // Target the ball's center; move toward it, scaled by difficulty for smoothing.
+      const paddleCenter = leftY + PADDLE_HEIGHT / 2;
+      const diff = ballY - paddleCenter;
+      // AI_DIFFICULTY (0..1) controls how aggressively it tracks the ball.
+      leftY += diff * AI_DIFFICULTY * 0.12;
+      // Keep the AI paddle within bounds.
+      if (leftY < 0) leftY = 0;
+      if (leftY > HEIGHT - PADDLE_HEIGHT) leftY = HEIGHT - PADDLE_HEIGHT;
+    }
+
+    // ---- Task 5: player paddle movement from input state ----
+    function updatePlayer() {
+      if (upPressed) rightY -= PADDLE_SPEED;
+      if (downPressed) rightY += PADDLE_SPEED;
+      // Keep the player paddle within canvas bounds.
+      if (rightY < 0) rightY = 0;
+      if (rightY > HEIGHT - PADDLE_HEIGHT) rightY = HEIGHT - PADDLE_HEIGHT;
+    }
+
+    // ---- Task 4: ball movement + collision detection ----
+    function updateBall() {
+      // Extra feature: ramp the ball up over time, capped so it stays playable.
+      speedMultiplier = Math.min(
+        MAX_SPEED_MULTIPLIER,
+        speedMultiplier + SPEED_RAMP_PER_FRAME
+      );
+
+      ballX += ballDX * speedMultiplier;
+      ballY += ballDY * speedMultiplier;
+
+      // Top/bottom wall collision -> reverse vertical direction.
+      if (ballY - BALL_RADIUS <= 0) {
+        ballY = BALL_RADIUS;
+        ballDY = Math.abs(ballDY);
+      } else if (ballY + BALL_RADIUS >= HEIGHT) {
+        ballY = HEIGHT - BALL_RADIUS;
+        ballDY = -Math.abs(ballDY);
+      }
+
+      // Left (computer) paddle collision -> reverse horizontal direction.
+      if (
+        ballX - BALL_RADIUS <= PADDLE_WIDTH &&
+        ballDX < 0 &&
+        ballY >= leftY &&
+        ballY <= leftY + PADDLE_HEIGHT
+      ) {
+        ballX = PADDLE_WIDTH + BALL_RADIUS;
+        ballDX = Math.abs(ballDX);
+      }
+
+      // Right (player) paddle collision -> reverse horizontal direction.
+      if (
+        ballX + BALL_RADIUS >= WIDTH - PADDLE_WIDTH &&
+        ballDX > 0 &&
+        ballY >= rightY &&
+        ballY <= rightY + PADDLE_HEIGHT
+      ) {
+        ballX = WIDTH - PADDLE_WIDTH - BALL_RADIUS;
+        ballDX = -Math.abs(ballDX);
+      }
+
+      // Off the left edge -> player scores, reset ball.
+      if (ballX + BALL_RADIUS < 0) {
+        playerScore++;
+        resetBall();
+      }
+      // Off the right edge -> computer scores, reset ball.
+      else if (ballX - BALL_RADIUS > WIDTH) {
+        computerScore++;
+        resetBall();
+      }
+    }
+
+    function update() {
+      updatePlayer();
+      updateAI();
+      updateBall();
+    }
+
+    // ---- Task 5: keyboard input handling with preventDefault ----
+    document.addEventListener('keydown', function (event) {
+      if (event.key === 'ArrowUp') {
+        upPressed = true;
+        event.preventDefault(); // stop the page from scrolling
+      } else if (event.key === 'ArrowDown') {
+        downPressed = true;
+        event.preventDefault();
+      }
+    });
+
+    document.addEventListener('keyup', function (event) {
+      if (event.key === 'ArrowUp') {
+        upPressed = false;
+        event.preventDefault();
+      } else if (event.key === 'ArrowDown') {
+        downPressed = false;
+        event.preventDefault();
+      }
+    });
+
+    // ---- Task 7: game loop at ~60 FPS (16ms) ----
+    function gameLoop() {
+      update();
+      draw();
+    }
+    setInterval(gameLoop, 16);
+  </script>
+</body>
+</html>
